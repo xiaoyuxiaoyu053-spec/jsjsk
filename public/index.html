@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Secret House Online</title>
+<style>
+*{box-sizing:border-box;user-select:none}html,body{margin:0;height:100%;overflow:hidden;background:#070707;color:#fff;font-family:Arial}
+#rotate{position:fixed;inset:0;z-index:999;display:none;place-items:center;background:#050505;text-align:center}
+#rotate div{font-size:22px}.big{font-size:70px;margin-bottom:20px}
+.screen{position:fixed;inset:0;display:none;place-items:center;background:radial-gradient(circle,#30261b22,transparent 50%),#0b0b0b}
+#home{display:grid}.panel{width:min(560px,92vw);padding:25px;background:#141414dd;border:1px solid #444;border-radius:20px;box-shadow:0 20px 80px #000}
+h1{text-align:center;letter-spacing:5px}input,button{width:100%;padding:14px;margin:6px 0;border:0;border-radius:10px}button{background:#343434;color:white;font-weight:bold;font-size:16px}button:active{transform:scale(.97)}
+#lobby3d,#game{position:fixed;inset:0;display:none}.canvas{position:absolute;inset:0}
+#lobbyUI{position:absolute;inset:0;pointer-events:none}.top{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:#0009;padding:10px 18px;border-radius:12px}
+#players{position:absolute;right:18px;top:18px;width:230px;background:#0009;padding:12px;border-radius:12px}
+.pl{display:flex;justify-content:space-between;padding:9px;margin:4px 0;background:#222c;border-radius:8px}
+#chars{position:absolute;left:18px;bottom:18px;width:260px;background:#0009;padding:12px;border-radius:12px;pointer-events:auto}
+#match{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:230px;pointer-events:auto}
+#gameFS{position:fixed;right:18px;top:18px;z-index:100;width:48px;height:42px;display:none;background:#222c;color:#fff;border:0;border-radius:12px;font-size:22px}#gameHUD{position:absolute;inset:0;pointer-events:none}.stats{position:absolute;top:15px;left:15px;text-shadow:0 2px 5px #000}
+#joy{position:fixed;left:25px;bottom:25px;width:130px;height:130px;border:3px solid #777;border-radius:50%;z-index:20;display:none}
+#stick{position:absolute;width:55px;height:55px;left:37px;top:37px;border-radius:50%;background:#aaa}
+#look{position:fixed;right:0;top:0;width:65%;height:100%;z-index:15;display:none}
+#act{position:fixed;right:25px;bottom:30px;width:82px;height:82px;border-radius:50%;z-index:25;display:none}
+#msg{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:50;display:none;padding:22px 30px;background:#000d;border-radius:15px;font-size:24px;text-align:center}
+#nameGate{position:fixed;inset:0;z-index:1000;display:none;place-items:center;background:#050505}
+#nameGate .panel{width:min(430px,90vw);padding:25px;background:#141414;border:1px solid #444;border-radius:18px}
+#identity{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;display:none;padding:28px 38px;background:#000e;border:1px solid #777;border-radius:18px;text-align:center;font-size:24px}
+#voice{position:fixed;right:25px;top:18px;z-index:30;display:none;width:100px;border-radius:22px;background:#222;color:#fff}
+#pcHint{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:26;background:#0009;padding:8px 14px;border-radius:12px;display:none}
+#fullscreenBtn{position:fixed;right:18px;top:18px;z-index:100;width:auto;padding:10px 14px;border-radius:12px;background:#222d;color:#fff}
+#fullscreenBtn2{position:fixed;right:18px;top:62px;z-index:100;width:auto;padding:10px 14px;border-radius:12px;background:#222d;color:#fff;display:none}
+.pseudoFullscreen{position:fixed!important;inset:0!important;z-index:99999!important;background:#000!important;overflow:hidden!important}
+</style>
+</head>
+<body>
+<div id="rotate"><div><div class="big">📱↔️</div>请横屏游玩</div></div>
+
+<section id="home" class="screen">
+ <div class="panel">
+  <h1>SECRET HOUSE</h1>
+  <p style="text-align:center;color:#aaa">3D MULTIPLAYER</p>
+  <input id="name" value="Star" placeholder="玩家名字">
+  <input id="room" placeholder="房间号（空白=自动匹配）">
+  <button onclick="connect()">快速匹配 / 加入房间</button>
+  <p id="status" style="color:#aaa;text-align:center"></p>
+ </div>
+</section>
+
+<section id="lobby3d">
+ <div id="lobbyCanvas" class="canvas"></div>
+ <div id="lobbyUI">
+  <div class="top">🏚️ 3D 等待大厅　房间：<span id="roomCode">----</span></div>
+  <div id="players"></div>
+  <div id="chars">
+   <b>选择角色</b>
+   <select id="character" style="width:100%;margin-top:8px;padding:10px">
+    <option>Scout</option><option>Detective</option><option>Ranger</option><option>Engineer</option>
+   </select>
+   <button onclick="choose()">确认角色</button>
+  </div>
+  <div id="match">
+   <button onclick="ready()">准备 / 取消准备</button>
+   <button id="startBtn" onclick="start()" style="display:none">开始游戏</button>
+  </div>
+ </div>
+</section>
+
+<section id="game">
+ <div id="gameCanvas" class="canvas"></div>
+ <button id="gameFS" onclick="toggleFullscreen()">⛶</button><div id="gameHUD"><div class="stats">🔑 <span id="keys">0</span>/3<br>❤️ <span id="hp">100</span></div></div>
+</section>
+<div id="joy"><div id="stick"></div></div>
+<div id="look"></div>
+<button id="act">互动</button>
+<div id="msg"></div>
+
+<button id="fullscreenBtn" onclick="toggleFullscreen()">⛶ 全屏</button>
+<button id="fullscreenBtn2" onclick="toggleFullscreen()">⛶ 全屏</button>\n<div id="nameGate"><div class="panel"><h2>输入你的名字</h2><p style="color:#aaa">必须设置名字才能进入游戏</p><input id="gateName" maxlength="18" placeholder="玩家名字"><button onclick="confirmName()">进入</button></div></div>
+<div id="identity"></div>
+<button id="sound" onclick="toggleSound()">🔊 音效</button><button id="voice" onclick="toggleVoice()">🎙️ 语音</button>
+<div id="pcHint">WASD 移动 · 鼠标视角 · E 互动 · Shift 奔跑</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+let ws,myId,roomCode,host=false,players=new Map(),mode="";
+let localStream=null,voiceOn=false,peers=new Map(),keysDown={},pcMode=false,mouseLocked=false;
+let scene,camera,renderer,objects=new Map(),keys=[],door;
+let yaw=0,pitch=0,mx=0,my=0,lastX=0,lastY=0,last=performance.now(),role="explorer";
+
+function show(id){document.querySelectorAll(".screen,#lobby3d,#game").forEach(x=>x.style.display="none");document.getElementById(id).style.display=id==="home"?"grid":"block"}
+function send(x){if(ws&&ws.readyState===1)ws.send(JSON.stringify(x))}
+function connect(){
+ const name=(document.getElementById("name").value||"").trim();
+ if(!name){document.getElementById("nameGate").style.display="grid";return;}
+ document.getElementById("status").textContent="正在连接服务器…";
+ ws=new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host);
+ ws.onopen=()=>send({type:"join",name:document.getElementById("name").value||"Player",room:document.getElementById("room").value,character:document.getElementById("character")?.value||"Scout"});
+ ws.onmessage=e=>handle(JSON.parse(e.data));
+ ws.onclose=()=>document.getElementById("status").textContent="连接已断开";
+}
+function confirmName(){
+ const n=(document.getElementById("gateName").value||"").trim();
+ if(!n)return;
+ document.getElementById("name").value=n;
+ document.getElementById("nameGate").style.display="none";
+ connect();
+}
+function handle(m){
+ if(m.type==="welcome")myId=m.id;
+ if(m.type==="joined"){roomCode=m.room;host=m.host;document.getElementById("roomCode").textContent=roomCode;show("lobby3d");initLobby();updateLobby(m.players)}
+ if(m.type==="lobby")updateLobby(m.players);
+ if(m.type==="gameStart"){show("game");audioInit();document.getElementById("gameFS").style.display="block";startGame(m.players);showIdentity(m.players)}
+ if(m.type==="voice")handleVoice(m);
+ if(m.type==="state")updatePlayer(m.player);
+ if(m.type==="world"){document.getElementById("keys").textContent=m.keys;if(m.doorOpen&&door)door.visible=false}
+ if(m.type==="transform"){const o=objects.get(m.id);setTransformed(o,m.transformed);if(m.id===myId){transformed=!!m.transformed;beep(120,.25,"sawtooth",.05);message(m.transformed?"👹 邻居变身！":"恢复原形")}}
+ if(m.type==="captured"){beep(120,.2,"square",.05);if(m.id===myId)message("☠️ 你被抓住了");}
+ if(m.type==="win")message("🎉 "+m.name+" 成功逃离！");
+ if(m.type==="error")message("⚠ "+m.message);
+}
+function updateLobby(list){
+ players.clear();list.forEach(p=>players.set(p.id,p));
+ document.getElementById("players").innerHTML=list.map(p=>`<div class="pl"><span>${p.host?"👑 ":""}${p.name}</span><span>${p.ready?"✓":"等待"} ${p.character}</span></div>`).join("");
+ host=list.some(p=>p.id===myId&&p.host);
+ document.getElementById("startBtn").style.display=host?"block":"none";
+}
+
+function showIdentity(list){
+ const me=list.find(p=>p.id===myId); if(!me)return;
+ role=me.role;
+ const box=document.getElementById("identity");
+ box.innerHTML=me.role==="neighbor"?"👹<br><b>你的身份：邻居</b>":"🧑<br><b>你的身份：居民</b>";
+ box.style.display="block";
+ document.getElementById("voice").style.display="block";
+ document.getElementById("pcHint").style.display="block";
+ setTimeout(()=>box.style.display="none",3000);
+}
+async function toggleVoice(){
+ if(voiceOn){
+  if(localStream)localStream.getTracks().forEach(t=>t.enabled=false);
+  voiceOn=false;document.getElementById("voice").textContent="🎙️ 语音";return;
+ }
+ try{
+  if(!localStream)localStream=await navigator.mediaDevices.getUserMedia({audio:true});
+  localStream.getTracks().forEach(t=>t.enabled=true);
+  voiceOn=true;document.getElementById("voice").textContent="🔴 麦克风";
+  await makeVoiceConnections();
+ }catch(e){message("请允许浏览器使用麦克风");}
+}
+async function makeVoiceConnections(){
+ if(!localStream)return;
+ for(const p of players.values()){
+  if(p.id===myId||peers.has(p.id))continue;
+  const pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  pc.onicecandidate=e=>{if(e.candidate)send({type:"voice",to:p.id,kind:"candidate",data:e.candidate})};
+  pc.ontrack=e=>{let a=document.getElementById("audio-"+p.id);if(!a){a=document.createElement("audio");a.id="audio-"+p.id;a.autoplay=true;document.body.appendChild(a)}a.srcObject=e.streams[0]};
+  peers.set(p.id,pc);
+  if(myId<p.id){
+   const offer=await pc.createOffer();await pc.setLocalDescription(offer);
+   send({type:"voice",to:p.id,kind:"offer",data:pc.localDescription});
+  }
+ }
+}
+async function handleVoice(m){
+ let pc=peers.get(m.from);
+ if(!pc){
+  pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+  if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  pc.onicecandidate=e=>{if(e.candidate)send({type:"voice",to:m.from,kind:"candidate",data:e.candidate})};
+  pc.ontrack=e=>{let a=document.getElementById("audio-"+m.from);if(!a){a=document.createElement("audio");a.id="audio-"+m.from;a.autoplay=true;document.body.appendChild(a)}a.srcObject=e.streams[0]};
+  peers.set(m.from,pc);
+ }
+ try{
+  if(m.kind==="offer"){await pc.setRemoteDescription(m.data);const ans=await pc.createAnswer();await pc.setLocalDescription(ans);send({type:"voice",to:m.from,kind:"answer",data:pc.localDescription})}
+  else if(m.kind==="answer")await pc.setRemoteDescription(m.data);
+  else if(m.kind==="candidate")await pc.addIceCandidate(m.data);
+ }catch(e){}
+}
+function choose(){send({type:"character",character:document.getElementById("character").value})}
+function ready(){send({type:"ready"})}
+function start(){send({type:"start"})}
+function message(t){let e=document.getElementById("msg");e.innerHTML=t;e.style.display="block";setTimeout(()=>e.style.display="none",1500)}
+
+function initLobby(){
+ const c=document.getElementById("lobbyCanvas");c.innerHTML="";
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x12100e);scene.fog=new THREE.Fog(0x12100e,6,35);
+ camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,100);camera.position.set(0,3,12);
+ renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);c.appendChild(renderer.domElement);
+ scene.add(new THREE.HemisphereLight(0x999999,0x222222,1.3));
+ const floor=new THREE.Mesh(new THREE.BoxGeometry(24,.4,24),new THREE.MeshStandardMaterial({color:0x3a332c}));floor.position.y=-.2;scene.add(floor);
+ for(let x=-10;x<=10;x+=5){const p=new THREE.Mesh(new THREE.BoxGeometry(1,4,1),new THREE.MeshStandardMaterial({color:0x5b4534}));p.position.set(x,2,-8);scene.add(p)}
+ const table=new THREE.Mesh(new THREE.BoxGeometry(7,.5,3),new THREE.MeshStandardMaterial({color:0x553820}));table.position.y=1;scene.add(table);
+ lobbyLoop();
+}
+function lobbyLoop(){if(document.getElementById("lobby3d").style.display==="block"){renderer.render(scene,camera);requestAnimationFrame(lobbyLoop)}}
+
+function makeBox(x,y,z,w,h,d,color){
+ const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color}));o.position.set(x,y,z);scene.add(o);return o
+}
+
+let soundOn=true,audioCtx=null,transformed=false,lastStep=0;
+function audioInit(){if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==="suspended")audioCtx.resume();}
+function beep(f,d=.08,type="sine",g=.035){if(!soundOn)return;audioInit();const o=audioCtx.createOscillator(),a=audioCtx.createGain();o.type=type;o.frequency.value=f;a.gain.setValueAtTime(g,audioCtx.currentTime);a.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+d);o.connect(a).connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+d);}
+function toggleSound(){soundOn=!soundOn;const b=document.getElementById("sound");if(b)b.textContent=soundOn?"🔊 音效":"🔇 音效";if(soundOn)beep(660);}
+function makeCharacter(neighbor){
+ const g=new THREE.Group();
+ const mat=new THREE.MeshStandardMaterial({color:neighbor?0x8d2929:0x2b6fb0});
+ const body=new THREE.Mesh(new THREE.CapsuleGeometry(.38,.85,4,8),mat);body.position.y=1.05;g.add(body);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.33,12,8),new THREE.MeshStandardMaterial({color:0xd19a78}));head.position.y=1.85;g.add(head);
+ for(const x of [-.12,.12]){const e=new THREE.Mesh(new THREE.SphereGeometry(.045,6,4),new THREE.MeshBasicMaterial({color:0x111111}));e.position.set(x,1.9,.3);g.add(e)}
+ for(const x of [-.16,.16]){const l=new THREE.Mesh(new THREE.BoxGeometry(.18,.65,.18),new THREE.MeshStandardMaterial({color:0x222222}));l.position.set(x,.35,0);g.add(l)}
+ g.userData.neighbor=neighbor;return g;
+}
+function setTransformed(o,on){if(!o)return;o.userData.transformed=on;o.scale.setScalar(on?1.2:1);o.children[0].material.color.setHex(on?0x6b1010:(o.userData.neighbor?0x8d2929:0x2b6fb0));}
+function startGame(list){
+ document.getElementById("joy").style.display="block";document.getElementById("look").style.display="block";document.getElementById("act").style.display="block";
+ const c=document.getElementById("gameCanvas");c.innerHTML="";
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x080808);scene.fog=new THREE.Fog(0x080808,4,34);
+ camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.05,100);camera.position.set(0,1.7,9);
+ renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);c.appendChild(renderer.domElement);
+ scene.add(new THREE.HemisphereLight(0x777777,0x111111,1));
+ makeBox(0,-.15,0,32,.3,32,0x333333);
+
+ // Original multi-room house shell
+ makeBox(0,2,-13,28,4,.5,0x514941);
+ makeBox(-14,2,0,.5,4,26,0x514941);
+ makeBox(14,2,0,.5,4,26,0x514941);
+ makeBox(0,2,13,28,4,.5,0x514941);
+
+ // Interior rooms and corridors
+ makeBox(-7,2,-5, .4,4,15,0x66564a);
+ makeBox(7,2,-5, .4,4,15,0x66564a);
+ makeBox(0,2,2, 14,4,.4,0x66564a);
+ makeBox(-7,2,8, 14,4,.4,0x66564a);
+ makeBox(7,2,-9, 14,4,.4,0x66564a);
+
+ // Front entrance and exit
+ door=makeBox(0,1.5,-12.7,3,3,.4,0x7a4b32);
+
+ // Stairs
+ for(let i=0;i<8;i++){
+   const step=makeBox(-1.8+i*.45,.2+i*.22,3.2+i*.25,.8,.4,.8,0x76583f);
+ }
+
+ // Furniture
+ const furniture=[
+  [-9,.7,-8,4,1,1.4,0x6b4934],[-9,1.1,-6,1,1.2,1,0x3f3027],
+  [9,.7,-8,3,1.2,1.5,0x49634c],[8,.7,-5,2,1,1,0x604a38],
+  [-9,.8,9,3,1.4,1.6,0x4b3d33],[8,.8,9,3,1.4,1.6,0x4b3d33],
+  [0,.7,7,2.8,1.3,1.2,0x694936],[0,.55,-5,2.5,1.1,1.1,0x55443a]
+ ];
+ furniture.forEach(f=>makeBox(...f));
+
+ // Windows
+ for(const x of [-10,-5,5,10]){
+   const w=makeBox(x,2,-12.7,2.2,1.5,.15,0x314e64);
+   w.material.emissive=new THREE.Color(0x102030);
+ }
+ for(const z of [-7,0,7]){
+   const w=makeBox(-13.7,2,z,.15,1.5,2.2,0x314e64);
+   w.material.emissive=new THREE.Color(0x102030);
+ }
+ players.clear();list.forEach(updatePlayer);let me=list.find(p=>p.id===myId);if(me){role=me.role;camera.position.set(me.x,me.y,me.z)}
+ requestAnimationFrame(gameLoop);
+}
+function updatePlayer(p){
+ players.set(p.id,p);
+ if(p.id===myId){role=p.role;return}
+ let o=objects.get(p.id);
+ if(!o){o=makeCharacter(p.role==="neighbor");scene.add(o);objects.set(p.id,o)}
+ setTransformed(o,!!p.transformed);
+ o.position.set(p.x,p.y-1.7,p.z);
+ o.rotation.y=p.yaw;
+}
+function gameLoop(now){
+ if(document.getElementById("game").style.display!=="block")return;
+ const dt=Math.min((now-last)/1000,.05);last=now;
+ if(pcMode){mx=(keysDown.KeyD?1:0)-(keysDown.KeyA?1:0);my=(keysDown.KeyS?1:0)-(keysDown.KeyW?1:0)}
+ const f=-my,s=mx;const sprint=pcMode&&keysDown.ShiftLeft?1.65:1;const d=new THREE.Vector3(Math.sin(yaw)*f+Math.cos(yaw)*s,0,Math.cos(yaw)*f-Math.sin(yaw)*s);
+ camera.position.add(d.multiplyScalar(4*dt*sprint));camera.position.x=Math.max(-11,Math.min(11,camera.position.x));camera.position.z=Math.max(-11,Math.min(11,camera.position.z));camera.rotation.order="YXZ";camera.rotation.y=yaw;camera.rotation.x=pitch;
+ send({type:"state",x:camera.position.x,y:camera.position.y,z:camera.position.z,yaw,pitch});
+ renderer.render(scene,camera);requestAnimationFrame(gameLoop);
+}
+
+const joy=document.getElementById("joy"),stick=document.getElementById("stick");
+joy.addEventListener("touchmove",e=>{const t=e.touches[0],r=joy.getBoundingClientRect();let x=t.clientX-(r.left+r.width/2),y=t.clientY-(r.top+r.height/2),l=Math.hypot(x,y),m=48;if(l>m){x=x/l*m;y=y/l*m}stick.style.left=37+x+"px";stick.style.top=37+y+"px";mx=x/m;my=y/m;e.preventDefault()},{passive:false});
+joy.addEventListener("touchend",()=>{mx=my=0;stick.style.left="37px";stick.style.top="37px"});
+document.getElementById("look").addEventListener("touchstart",e=>{lastX=e.touches[0].clientX;lastY=e.touches[0].clientY},{passive:false});
+document.getElementById("look").addEventListener("touchmove",e=>{const t=e.touches[0];yaw-=(t.clientX-lastX)*.006;pitch-=(t.clientY-lastY)*.004;pitch=Math.max(-1.2,Math.min(1.2,pitch));lastX=t.clientX;lastY=t.clientY;e.preventDefault()},{passive:false});
+document.getElementById("act").onclick=()=>tryInteract();
+
+function tryInteract(){
+ if(!camera)return;
+ audioInit();
+ if(role==="neighbor"){
+  if(!transformed){send({type:"transform"});return}
+  let best=null,bd=2.8;
+  for(const [id,o] of objects){const d=camera.position.distanceTo(o.position);if(d<bd){bd=d;best=id}}
+  if(best){send({type:"capture",target:best});return}
+ }
+ if(door&&camera.position.distanceTo(door.position)<3){door.visible=!door.visible;beep(240,.12,"triangle",.05);return}
+ send({type:"key"});beep(720,.08);
+}
+addEventListener("keydown",e=>{keysDown[e.code]=true;if(e.code==="KeyE")tryInteract()});
+addEventListener("keyup",e=>keysDown[e.code]=false);
+addEventListener("mousemove",e=>{if(!pcMode||!mouseLocked)return;yaw-=e.movementX*.0025;pitch-=e.movementY*.002;pitch=Math.max(-1.2,Math.min(1.2,pitch))});
+document.getElementById("game").addEventListener("click",()=>{if(innerWidth>innerHeight){pcMode=true;const el=document.getElementById("game");if(el.requestPointerLock)el.requestPointerLock();mouseLocked=true}});
+document.addEventListener("pointerlockchange",()=>{mouseLocked=document.pointerLockElement===document.getElementById("game")});
+
+async function toggleFullscreen(){
+ try{
+  if(!document.fullscreenElement){
+   await document.documentElement.requestFullscreen();
+   document.getElementById("fullscreenBtn").textContent="⛶ 退出全屏";
+  }else{
+   await document.exitFullscreen();
+   document.getElementById("fullscreenBtn").textContent="⛶ 全屏";
+  }
+ }catch(e){message("当前浏览器不允许全屏，请使用浏览器菜单全屏")}
+}
+document.addEventListener("fullscreenchange",()=>{
+ document.getElementById("fullscreenBtn").textContent=document.fullscreenElement?"⛶ 退出全屏":"⛶ 全屏";
+});
+
+async function toggleFullscreen(){
+ const doc=document;
+ try{
+  if(!doc.fullscreenElement){
+   const el=doc.documentElement;
+   if(el.requestFullscreen) await el.requestFullscreen({navigationUI:"hide"});
+   else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  }else{
+   if(doc.exitFullscreen) await doc.exitFullscreen();
+   else if(doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+  }
+ }catch(e){
+   // Fallback for browsers that block Fullscreen API:
+   document.body.classList.toggle("pseudoFullscreen");
+ }
+ updateFullscreenButtons();
+}
+function updateFullscreenButtons(){
+ const on=!!document.fullscreenElement || document.body.classList.contains("pseudoFullscreen");
+ document.getElementById("fullscreenBtn").textContent=on?"⛶ 退出全屏":"⛶ 全屏";
+ document.getElementById("fullscreenBtn2").textContent=on?"⛶ 退出全屏":"⛶ 全屏";
+ document.getElementById("gameFS").textContent=on?"×":"⛶";
+}
+document.addEventListener("fullscreenchange",updateFullscreenButtons);
+document.addEventListener("webkitfullscreenchange",updateFullscreenButtons);
+
+function orient(){document.getElementById("rotate").style.display=innerWidth<innerHeight?"grid":"none"}
+addEventListener("resize",()=>{orient();if(camera){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)}});orient();
+</script>
+</body>
+</html>
